@@ -1,11 +1,8 @@
 import os
-
 import numpy as np
 import pandas as pd
 import csv
-
 import igl
-
 from tqdm import tqdm
 
 
@@ -196,73 +193,68 @@ def principal_curvature(K_H,K_G):
 ### here the curvature is compute
 
 
-def triangle_principal_curvatures(vertices, triangles, model_name,backup = True):
-    
-    arr_K_G = []
-    arr_K_H = []
-    arr_K1 = []
-    arr_K2 = []
-    arr_K1_F = []
-    arr_K2_F = []
-    
-    ## search for backup as default 
-    if os.path.exists('curvature_backup/curvature_vertex_' + model_name[:-4] + '.csv') and backup:
-        df = pd.read_csv('curvature_backup/curvature_vertex_' + model_name[:-4] + '.csv')
-        arr_K1 = df['Principal_1'].tolist()
-        arr_K2 = df['Principal_2'].tolist() 
-        df = pd.read_csv('curvature_backup/curvature_face_' + model_name[:-4] + '.csv')
-        arr_K1_F = df['Principal_1'].tolist()
-        arr_K2_F = df['Principal_2'].tolist()
-        print('geometric properties loaded from backup')
-    
-    ## else compute
-    else:
-        ## Neighbouting vertices per vertex
-        print('Neighbouring vertices per vertex')  
-        neighbor_vertices = []
-        for idx in tqdm(range(len(vertices))):
-            neighbor_vertices.append([get_neighbors_2(idx, triangles)])
+def triangle_principal_curvatures(vertices, triangles, model_name, backup = True):
+	arr_K_G = []
+	arr_K_H = []
+	arr_K1 = []
+	arr_K2 = []
+	arr_K1_F = []
+	arr_K2_F = []
+	data_backup = 'data_backup/' + model_name + '/' 
 
-        # Curvature per each vertex
-        for i in tqdm(range(len(vertices))):
-            neighbors = neighbor_vertices[i][0]
-            a_mixed = A_mixed(i,vertices[i],np.copy(neighbors),np.copy(vertices),np.copy(triangles))
-            if a_mixed=='#' or a_mixed==0:
-                arr_K_G.append(0.)
-                arr_K_H.append(0.)
-                arr_K1.append(0.)
-                arr_K2.append(0.)
-                continue
-            K_G = gaussian_curvature(np.copy(i),np.copy(vertices[i]),np.copy(a_mixed),np.copy(neighbors),np.copy(vertices),np.copy(triangles)) 
-            K = mean_normal_curvature(np.copy(i),np.copy(vertices[i]),np.copy(a_mixed),np.copy(neighbors),np.copy(vertices),np.copy(triangles))
-            K_H = mean_curvature(K)
-            K1, K2 = principal_curvature(K_H,K_G)
-            
-            arr_K_G.append(K_G)
-            arr_K_H.append(K_H)
-            arr_K1.append(K1)
-            arr_K2.append(K2)
+	## search for backup as default
+	if os.path.exists(data_backup + 'curvature.csv') and backup:
+		print('\n MeshGeometry -> load \n')
+		df = pd.read_csv(data_backup + 'curvature.csv')
+		arr_K1_F = df['Principal_1'].tolist()
+		arr_K2_F = df['Principal_2'].tolist()
         
-        print('avarage principal curvatures for each face')
-        for ver_idx in tqdm(triangles):
-            arr_K1_F.append(np.average([arr_K1[ver_idx[0]], arr_K1[ver_idx[1]], arr_K1[ver_idx[2]]]))
-            arr_K2_F.append(np.average([arr_K2[ver_idx[0]], arr_K2[ver_idx[1]], arr_K2[ver_idx[2]]]))
+	## else compute
+	else:
+		## Neighbouting vertices per vertex
+		print('\n MeshGeometry -> compute \n')  
+		neighbor_vertices = []
+		for idx in tqdm(range(len(vertices))):
+			neighbor_vertices.append([get_neighbors_2(idx, triangles)])
+		# Curvature per each vertex
+		for i in tqdm(range(len(vertices))):
+			neighbors = neighbor_vertices[i][0]
+			a_mixed = A_mixed(i,vertices[i],np.copy(neighbors),np.copy(vertices),np.copy(triangles))
+			if a_mixed=='#' or a_mixed==0:
+				arr_K_G.append(0.)
+				arr_K_H.append(0.)
+				arr_K1.append(0.)
+				arr_K2.append(0.)
+				continue
+			K_G = gaussian_curvature(np.copy(i),np.copy(vertices[i]),np.copy(a_mixed),np.copy(neighbors),np.copy(vertices),np.copy(triangles)) 
+			K = mean_normal_curvature(np.copy(i),np.copy(vertices[i]),np.copy(a_mixed),np.copy(neighbors),np.copy(vertices),np.copy(triangles))
+			K_H = mean_curvature(K)
+			K1, K2 = principal_curvature(K_H,K_G)
+			
+			arr_K_G.append(K_G)
+			arr_K_H.append(K_H)
+			arr_K1.append(K1)
+			arr_K2.append(K2)
+		
+		for ver_idx in triangles:
+			arr_K1_F.append(np.average([arr_K1[ver_idx[0]], arr_K1[ver_idx[1]], arr_K1[ver_idx[2]]]))
+			arr_K2_F.append(np.average([arr_K2[ver_idx[0]], arr_K2[ver_idx[1]], arr_K2[ver_idx[2]]]))
 
-            
-        # save to csv file 
-        with open('curvature_backup/curvature_vertex_' + model_name[:-4] + '.csv', 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile, delimiter=',')
-            writer.writerow(['Vertex', 'Principal_1', 'Principal_2'])
-            for i in range(len(arr_K1)):
-                writer.writerow([i, arr_K1[i], arr_K2[i]])
+			
+		# save to csv file 
+		# with open('curvature_backup/curvature_vertex_' + model_name[:-4] + '.csv', 'w', newline='') as csvfile:
+		#     writer = csv.writer(csvfile, delimiter=',')
+		#     writer.writerow(['Vertex', 'Principal_1', 'Principal_2'])
+		#     for i in range(len(arr_K1)):
+		#         writer.writerow([i, arr_K1[i], arr_K2[i]])
 
-        with open('curvature_backup/curvature_face_' + model_name[:-4] + '.csv', 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile, delimiter=',')
-            writer.writerow(['Triangle_id', 'Principal_1', 'Principal_2'])	
-            for j in range(len(arr_K1_F)):
-                writer.writerow([i, arr_K1_F[j], arr_K2_F[j]])
-    
-    return np.array(arr_K1_F), np.array(arr_K2_F)
+		with open(data_backup + 'curvature.csv', 'w', newline='') as csvfile:
+			writer = csv.writer(csvfile, delimiter=',')
+			writer.writerow(['Triangle_id', 'Principal_1', 'Principal_2'])	
+			for j in range(len(arr_K1_F)):
+				writer.writerow([i, arr_K1_F[j], arr_K2_F[j]])
+
+	return np.array(arr_K1_F), np.array(arr_K2_F)
 
 
 def triangle_principal_directions(vertices, triangles):
